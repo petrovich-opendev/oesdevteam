@@ -55,12 +55,22 @@ repository.
 # Prerequisites: Python 3.11+, Claude Code CLI, NATS JetStream, git
 pip install -e ".[dev]"
 
-# Run tests
+# Run tests (offline — no Claude calls, no cost)
 pytest
 
-# (After bootstrap is complete:)
-# python3 run_features.py namespaces/dev/<your-project>
+# Optional smoke test against the real Claude CLI (~$1 of Opus time)
+# Single reviewer — cheapest way to confirm the bridge works:
+python3 scripts/smoke_squad.py --roles senior_backend
+# Full five-reviewer squad:
+python3 scripts/smoke_squad.py
 ```
+
+See [`docs/MIGRATION_PLAN.md`](docs/MIGRATION_PLAN.md) for the
+step-by-step procedure to fold these modules into an existing
+multi-agent controller, and
+[`docs/INTEGRATION_EXAMPLE.md`](docs/INTEGRATION_EXAMPLE.md) for the
+minimum code delta that wires the v2 gates into a typical
+feature-controller state machine.
 
 ## Architecture
 
