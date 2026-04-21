@@ -29,6 +29,7 @@ from .api_contract_gate import (
 )
 from .base import Gate, GateInput, GateResult, format_gate_report
 from .code_review_gate import CodeReviewGate, run_code_review_gate
+from .sre_review_gate import SreReviewConfig, SreReviewGate, run_sre_review_gate
 
 __all__ = [
     "ApiContractConfig",
@@ -37,7 +38,10 @@ __all__ = [
     "Gate",
     "GateInput",
     "GateResult",
+    "SreReviewConfig",
+    "SreReviewGate",
     "format_gate_report",
     "run_api_contract_gate",
     "run_code_review_gate",
+    "run_sre_review_gate",
 ]

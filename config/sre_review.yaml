@@ -1,0 +1,81 @@
+# ============================================================================
+# OESDevTeam — SRE Review Gate — applicability patterns
+# ============================================================================
+#
+# last_reviewed: 2026-04-21
+#
+# PURPOSE
+# -------
+# The SRE review gate only runs when a feature actually touches deploy
+# surface — otherwise spending an Opus call on a CSS tweak is waste.
+# These glob-style patterns declare what "deploy surface" means on
+# this project.
+#
+# RULE OF THUMB
+# -------------
+# If changing this file would break an on-call shift, it belongs here.
+# If changing it only affects a developer's local ergonomics, it does
+# not.
+#
+# PATTERN SYNTAX
+# --------------
+# fnmatch semantics (`*`, `**`, `?`) matched against repo-root-relative
+# forward-slash paths. See the API contract gate's config for the same
+# conventions.
+# ============================================================================
+
+version: 1
+
+# Any file matching these patterns triggers an SRE review. Missing
+# coverage is better addressed by adding patterns than by writing a
+# one-off bypass. Keep the list conservative — more files = slower and
+# more expensive pipeline.
+deploy_surface:
+  patterns:
+    # Container runtime
+    - "Dockerfile"
+    - "**/Dockerfile"
+    - "Dockerfile.*"
+    - "docker-compose.yml"
+    - "docker-compose.*.yml"
+    - "**/docker-compose*.yml"
+
+    # Orchestration
+    - "k8s/**/*.yaml"
+    - "k8s/**/*.yml"
+    - "kubernetes/**/*.yaml"
+    - "**/manifests/**/*.yaml"
+    - "**/helm/**"
+    - "**/*.helmignore"
+
+    # Infrastructure as code
+    - "**/*.tf"
+    - "**/*.tfvars"
+
+    # Reverse proxy / TLS / web server
+    - "nginx/**"
+    - "**/nginx.conf"
+    - "**/*.nginx"
+
+    # OS service units
+    - "systemd/**"
+    - "**/*.service"
+    - "**/*.timer"
+
+    # CI / release automation
+    - ".github/workflows/**"
+    - ".gitlab-ci.yml"
+    - ".circleci/**"
+    - "Makefile"
+    - "scripts/deploy*"
+    - "scripts/release*"
+
+    # Database migrations
+    - "**/migrations/**"
+    - "**/alembic/versions/**"
+    - "**/*.sql"
+
+    # Secrets / env surface (file changes to env templates counts)
+    - ".env.example"
+    - "**/.env.example"
+    - "**/secrets/**"

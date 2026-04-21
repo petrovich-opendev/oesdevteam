@@ -17,8 +17,8 @@ business goal?* If not — revert and reconsider.
 | 2 | 5 Senior Reviewers (BE/FE/Data/Perf/Business) | P0       | ✅ done        |
 | 3 | Blocking Code Review Gate                     | P0       | ✅ done        |
 | 4 | API Contract Gate (OpenAPI → TS)              | P1       | ✅ done        |
-| 5 | DevOps SRE Review gate                        | P1       | ⏳ next        |
-| 6 | Langfuse + Cost budget enforce                | P1       | ⏳ queued      |
+| 5 | DevOps SRE Review gate                        | P1       | ✅ done        |
+| 6 | Langfuse + Cost budget enforce                | P1       | ⏳ next        |
 | 7 | Stuck auto-escalation                         | P2       | ⏳ queued      |
 | 8 | Positive learning loop                        | P2       | ⏳ queued      |
 
@@ -199,3 +199,52 @@ for a later step.
 repeated failures from v1 — contract drift — without adding an LLM
 dependency. This is the kind of gate a pipeline must have to claim
 "production code without manual intervention".
+
+## Step 5 — DevOps SRE Review Gate — done
+
+**Goal:** catch deploy-layer risks (missing rollback plan, irreversible
+migrations, resourcelimit absence, stripped observability) that the
+application-focused squad does not cover. Runs only on features that
+touch actual deploy surface — otherwise spending an Opus call on a
+CSS tweak would be waste.
+
+**Delivered:**
+- `config/sre_review.yaml` — deploy-surface glob patterns (Dockerfile,
+  docker-compose, k8s manifests, Terraform, nginx, systemd, CI,
+  migrations, env-templates).
+- `prompts/reviewers/senior_sre.md` — SRE checklist (blast radius,
+  rollback, migrations, health, observability, secrets, resources,
+  security), same JSON contract as the five squad reviewers,
+  prompt-injection resistance preamble included.
+- `src/gates/sre_review_gate.py` — `SreReviewGate` class,
+  `run_sre_review_gate` function, `render_sre_review_report`. Reuses
+  `ReviewerRunner` / `parse_review_response` / `build_task_message`
+  from the squad, so mocks and parser stay consistent across gates.
+- `AgentRole.SENIOR_SRE` added to the vocabulary, mapped in
+  `config/models.yaml` to Opus 4.7 with a $1.00 ceiling.
+- `QualityGateType.SRE_REVIEW` added for explicit classification (was
+  previously a placeholder on APPSEC_REVIEW during initial scaffolding).
+- `tests/test_sre_review_gate.py` — 15 tests covering applicability
+  short-circuit, approve path, blocker path, major path, reviewer
+  crash, invalid JSON, config loading, report rendering, emoji-free
+  output.
+
+**Design properties:**
+- Short-circuits to PASS without invoking the reviewer when the feature
+  does not touch deploy surface — confirmed by test that asserts
+  `runner.calls == []`.
+- Any blocker or major finding blocks; contract matches the squad gate.
+- Parser errors become reviewer_fault → blocker (major-severity),
+  never silent approve.
+
+**Verification:**
+- `ruff check .` → clean
+- `ruff format --check .` → clean
+- `pytest -q` → 106 / 106 pass (+15 new)
+
+**Business-goal alignment:** ✅ plugs the deploy-layer hole that v1
+lessons-learned identified as a recurring source of production
+outages. Now a feature that adds a Dockerfile, migration, or k8s
+manifest is held to the same "no ambiguous silent pass" standard as
+application code — required for autonomous codegen that actually
+deploys, not just compiles.

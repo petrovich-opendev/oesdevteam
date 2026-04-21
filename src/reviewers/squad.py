@@ -70,6 +70,10 @@ _PROMPT_FILENAME: dict[AgentRole, str] = {
     AgentRole.SENIOR_DATA: "senior_data.md",
     AgentRole.SENIOR_PERFORMANCE: "senior_performance.md",
     AgentRole.BUSINESS_EXPERT: "business_expert.md",
+    # SRE is not part of the five-reviewer squad but uses the same
+    # prompt-loading machinery. The SRE gate (src/gates/sre_review_gate.py)
+    # calls ``load_reviewer_prompt(SENIOR_SRE)`` directly.
+    AgentRole.SENIOR_SRE: "senior_sre.md",
 }
 
 
@@ -86,9 +90,9 @@ def load_reviewer_prompt(role: AgentRole, *, domain_context: str = "") -> str:
         KeyError: if the role is not one of the five reviewer roles.
     """
     if role not in _PROMPT_FILENAME:
+        allowed = sorted(r.value for r in _PROMPT_FILENAME)
         raise KeyError(
-            f"{role.value!r} is not a reviewer role. "
-            f"Expected one of: {[r.value for r in REVIEWER_ROLES]}"
+            f"{role.value!r} is not a role with a prompt file. Expected one of: {allowed}"
         )
 
     path = _PROMPT_DIR / _PROMPT_FILENAME[role]

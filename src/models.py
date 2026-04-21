@@ -54,6 +54,10 @@ class AgentRole(StrEnum):
     SENIOR_PERFORMANCE = "senior_performance"
     BUSINESS_EXPERT = "business_expert"
 
+    # v2 — Senior SRE (deploy-readiness gate). Not part of REVIEWER_ROLES —
+    # runs in its own gate, only when a feature touches deploy surface.
+    SENIOR_SRE = "senior_sre"
+
 
 class AgentStatus(StrEnum):
     """Lifecycle of a single agent invocation."""
@@ -111,6 +115,7 @@ class QualityGateType(StrEnum):
     UX_REVIEW = "ux_review"
     SENIOR_REVIEW = "senior_review"  # v2 — the five-reviewer gate
     API_CONTRACT = "api_contract"  # v2 — OpenAPI↔TS types consistency
+    SRE_REVIEW = "sre_review"  # v2 — deploy-readiness gate (single SRE reviewer)
     GOAL_VERIFICATION = "goal_verification"
 
 
