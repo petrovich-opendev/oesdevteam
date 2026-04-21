@@ -10,12 +10,43 @@ touching squad orchestration.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import tempfile
 from typing import Protocol
 
 from ..claude_bridge import build_claude_cli_command
 from ..models import AgentRole
+
+
+def _unwrap_claude_cli_envelope(stdout: str) -> tuple[str, float]:
+    """Strip the ``claude -p --output-format json`` metadata envelope.
+
+    Claude Code CLI with ``--output-format json`` returns a wrapper object:
+    ``{"type": "result", "subtype": "success", "result": "<text>",
+    "cost_usd": 0.12, "duration_ms": 45000, ...}``. The reviewer's actual
+    output lives in ``result``; ``cost_usd`` is the authoritative per-call
+    cost our cost tracker should record.
+
+    Returns ``(inner_text, cost_usd)``. If ``stdout`` is not an envelope
+    (e.g. text mode, or a non-JSON error dump), returns ``(stdout, 0.0)``
+    unchanged — the parser downstream still tolerates raw JSON or prose.
+    """
+    if not stdout.strip():
+        return stdout, 0.0
+    try:
+        envelope = json.loads(stdout)
+    except json.JSONDecodeError:
+        return stdout, 0.0
+    if (
+        isinstance(envelope, dict)
+        and envelope.get("type") == "result"
+        and "result" in envelope
+    ):
+        inner = envelope.get("result", "") or ""
+        cost = float(envelope.get("cost_usd", 0.0) or 0.0)
+        return inner, cost
+    return stdout, 0.0
 
 
 class ReviewerRunner(Protocol):
@@ -67,9 +98,17 @@ class ClaudeCliReviewerRunner:
         self.timeout_seconds = timeout_seconds
         self.work_dir = work_dir or os.getcwd()
         self.claude_bin = claude_bin
+        # Cost of the most recent call, unwrapped from the Claude CLI
+        # envelope. Read after ``run`` returns. 0.0 when unavailable.
+        self.last_call_cost_usd: float = 0.0
 
     async def run(self, *, role: AgentRole, system_prompt: str, task: str) -> str:
-        """Launch Claude CLI for one reviewer; return its stdout text."""
+        """Launch Claude CLI for one reviewer; return the reviewer's JSON text.
+
+        Strips the ``claude -p --output-format json`` metadata envelope
+        before returning — downstream parsers see the reviewer's own JSON
+        exactly as the reviewer was asked to produce it.
+        """
         cmd = build_claude_cli_command(
             role=role,
             task=task,
@@ -113,7 +152,9 @@ class ClaudeCliReviewerRunner:
                 f"with empty stdout. stderr: {stderr}"
             )
 
-        return stdout
+        inner, cost = _unwrap_claude_cli_envelope(stdout)
+        self.last_call_cost_usd = cost
+        return inner
 
 
 # -----------------------------------------------------------------------------
