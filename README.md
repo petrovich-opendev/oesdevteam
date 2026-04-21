@@ -1,7 +1,12 @@
 # OESDevTeam
 
+[![CI](https://img.shields.io/github/actions/workflow/status/REPLACE_ME/oesdevteam/ci.yml?branch=main&label=ci)](https://github.com/REPLACE_ME/oesdevteam/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](pyproject.toml)
+[![Model](https://img.shields.io/badge/LLM-Claude%20Opus%204.7-8A2BE2)](config/models.yaml)
+
 Production-grade multi-agent code generation pipeline. Give it a specification,
-get working, reviewed, deployed code.
+get working, reviewed, committed code.
 
 ## What it is
 
@@ -43,26 +48,46 @@ OESDevTeam addresses this with:
 
 ## Status
 
-🚧 **v2 upgrade in progress.** See [PROGRESS.md](PROGRESS.md) for step-by-step
-implementation status. OESDevTeam is the public, hardened, reviewer-heavy
-evolution of an internal v1 pipeline that shipped ~170 features before the
-authors decided the quality gates needed a complete redesign — hence this
-repository.
+**v2 complete and migrated into production.** All nine roadmap blocks
+have landed (see [PROGRESS.md](PROGRESS.md) and [CHANGELOG.md](CHANGELOG.md)).
+Validated end-to-end on the real Claude Code CLI across seven smoke
+runs against both trivial and BioCoach-flavoured Telegram-bot code.
+Adaptive domain context (Opus 4.7) cached per-namespace; blocking
+Code-Review Gate catches real issues (e.g. `__pycache__` artefacts,
+missing gitignore rules) before commit.
+
+OESDevTeam is the public, reviewer-heavy evolution of an internal v1
+multi-agent pipeline (~170 features shipped, 96% success) that
+outgrew its advisory-only review stage.
 
 ## Quick start
 
 ```bash
-# Prerequisites: Python 3.11+, Claude Code CLI, NATS JetStream, git
+# Prerequisites: Python 3.11+, Claude Code CLI, NATS JetStream (optional), git
+git clone https://github.com/REPLACE_ME/oesdevteam.git
+cd oesdevteam
+python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
-# Run tests (offline — no Claude calls, no cost)
+# Run the 179-test suite — offline, zero cost, ~1.5 s
 pytest
 
-# Optional smoke test against the real Claude CLI (~$1 of Opus time)
-# Single reviewer — cheapest way to confirm the bridge works:
-python3 scripts/smoke_squad.py --roles senior_backend
-# Full five-reviewer squad:
-python3 scripts/smoke_squad.py
+# Optional smoke test against the real Claude CLI
+python3 scripts/smoke_squad.py --roles senior_backend    # ~$0.20
+python3 scripts/smoke_squad.py                           # full five-reviewer, ~$1
+```
+
+Smoke-test modes can also be controlled via env vars at runtime:
+
+```bash
+# Non-blocking advisory (useful on a soak period before flipping to binding)
+OESDEVTEAM_SENIOR_REVIEW_MODE=advisory python3 run_features.py <namespace>
+
+# Emergency bypass — skip the squad entirely
+OESDEVTEAM_SENIOR_REVIEW_MODE=disabled python3 run_features.py <namespace>
+
+# Skip the Opus-backed adaptive domain brief (fall back to raw signals)
+OESDEVTEAM_DOMAIN_BRIEF_DISABLED=1 python3 run_features.py <namespace>
 ```
 
 See [`docs/MIGRATION_PLAN.md`](docs/MIGRATION_PLAN.md) for the

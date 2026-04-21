@@ -1,0 +1,51 @@
+name: CI
+
+# Run on every push and pull request. Keeps the reviewer-friendly
+# signal visible in the GitHub UI without any manual trigger.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # Tested locally against 3.12; 3.11 is declared in pyproject as
+        # the minimum. Keeping both in CI catches accidental 3.12-only
+        # syntax that would break a contributor on the minimum version.
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          # Pip caching keeps subsequent runs to ~5 s of install time.
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install project + dev extras
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Lint (ruff)
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Test (pytest)
+        # The integration tests in tests/test_cli_integration.py require
+        # the Claude Code CLI. They skip automatically when the binary
+        # is not on PATH (see the module-level pytest.skip). GitHub's
+        # hosted runners do not ship with `claude`, so those tests are
+        # skipped here — every pure-Python test still executes.
+        run: pytest -q
