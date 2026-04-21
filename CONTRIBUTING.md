@@ -78,6 +78,14 @@ end user, the code is missing a reviewer.
 
 Be kind; be direct. Disagreements are welcome; personal attacks are not.
 
+## Contact
+
+Maintainer: **Ruslan Karimov** — [rkarimov.mail@gmail.com](mailto:rkarimov.mail@gmail.com).
+
+For questions that do not fit an issue or PR (e.g. architectural
+discussions, private security reports, validation on real production
+systems like [agentdata.pro](https://agentdata.pro/)), email directly.
+
 ## License
 
 By contributing you agree your contribution is licensed under MIT (see

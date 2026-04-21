@@ -9,7 +9,12 @@ description = "Production-grade multi-agent code generation pipeline"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.11"
-authors = [{ name = "OESDevTeam contributors" }]
+authors = [
+    { name = "Ruslan Karimov", email = "rkarimov.mail@gmail.com" },
+]
+maintainers = [
+    { name = "Ruslan Karimov", email = "rkarimov.mail@gmail.com" },
+]
 keywords = ["multi-agent", "llm", "code-generation", "claude", "nats"]
 classifiers = [
     "Development Status :: 3 - Alpha",

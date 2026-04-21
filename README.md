@@ -102,6 +102,24 @@ feature-controller state machine.
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design: agent
 roles, state machine, quality gates, drift detection, and model routing.
 
+## Real-world validation
+
+OESDevTeam's Senior Reviewer squad, adaptive domain context, and binding
+code-review gate have been validated end-to-end on the real Claude Code CLI
+against code for [**agentdata.pro**](https://agentdata.pro/) — a live
+Telegram-based retail health-coaching service. The smoke runs exercised
+the Business Domain Expert reviewer with an Opus-generated, BioCoach-
+specific domain brief, and the squad caught concrete issues (scope
+violations of acceptance scripts, Russian-language terminology mismatches
+in Telegram bot copy) that a generic linter would miss.
+
+## Author
+
+**Ruslan Karimov** — [rkarimov.mail@gmail.com](mailto:rkarimov.mail@gmail.com)
+
+Questions, feedback, and PRs welcome via the
+[issues tracker](https://github.com/petrovich-opendev/oesdevteam/issues).
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
