@@ -48,15 +48,37 @@ OESDevTeam addresses this with:
 
 ## Status
 
-**v2 complete and migrated into production.** All nine roadmap blocks
-have landed (see [PROGRESS.md](PROGRESS.md) and [CHANGELOG.md](CHANGELOG.md)).
+**v2 library complete.** All nine roadmap blocks have landed (see
+[PROGRESS.md](PROGRESS.md) and [CHANGELOG.md](CHANGELOG.md)).
 Validated end-to-end on the real Claude Code CLI across seven smoke
 runs against both trivial and BioCoach-flavoured Telegram-bot code.
-Adaptive domain context (Opus 4.7) cached per-namespace; blocking
-Code-Review Gate catches real issues (e.g. `__pycache__` artefacts,
-missing gitignore rules) before commit.
+Adaptive domain context (Opus 4.7) is cached per-namespace; the
+blocking Code-Review Gate catches real issues (scope violations of
+acceptance scripts, Russian-language terminology mismatches in
+Telegram copy, `__pycache__` artefacts) before commit.
 
-OESDevTeam is the public, reviewer-heavy evolution of an internal v1
+### What this repo ships
+
+- A **library** of v2 quality gates, Senior Reviewer squad, adaptive
+  domain-context loader, cost tracker, and learning loop (see
+  `src/`). 179 unit and integration tests.
+- A **review-only CLI** (`run_features.py`) — run the gate chain
+  against a namespace's current working tree to get a Markdown
+  verdict. No worker invocation, no commits; a tool for "did my
+  change pass the squad?"
+- A **smoke runner** (`scripts/smoke_squad.py`) — end-to-end check
+  against the real Claude CLI on a fixed diff.
+
+### What this repo does NOT ship
+
+A turnkey autonomous ``FeatureController`` state machine (worker →
+verify → gate → reflection → retry → commit → deploy). The reference
+implementation of that controller lives in a companion internal
+project. To wire the library here into your own controller, follow
+[`docs/INTEGRATION_EXAMPLE.md`](docs/INTEGRATION_EXAMPLE.md) — the
+recipe is ~30 lines of integration code.
+
+OESDevTeam is the public, reviewer-heavy evolution of an internal
 multi-agent pipeline (~170 features shipped, 96% success) that
 outgrew its advisory-only review stage.
 
@@ -77,17 +99,37 @@ python3 scripts/smoke_squad.py --roles senior_backend    # ~$0.20
 python3 scripts/smoke_squad.py                           # full five-reviewer, ~$1
 ```
 
-Smoke-test modes can also be controlled via env vars at runtime:
+### Review-only CLI
+
+``run_features.py`` takes a namespace directory with ``features.json``
+and runs the gate chain against the current working tree — without
+launching any worker agent or committing anything. Useful when you
+already wrote the code (manually or with your own agent) and want the
+Senior squad's verdict:
 
 ```bash
-# Non-blocking advisory (useful on a soak period before flipping to binding)
-OESDEVTEAM_SENIOR_REVIEW_MODE=advisory python3 run_features.py <namespace>
+# Full gate chain: API contract → Senior squad (5 × Opus) → SRE gate.
+# Cost ≈ $1 per feature with non-trivial diff.
+python3 run_features.py namespaces/dev/my-feature
 
-# Emergency bypass — skip the squad entirely
+# Deterministic only — skip every LLM-backed gate.
+python3 run_features.py namespaces/dev/my-feature --dry-run
+
+# Single gate (useful for fast iteration on contract-only changes).
+python3 run_features.py namespaces/dev/my-feature --only=api-contract
+```
+
+### Env-var toggles
+
+```bash
+# Emergency bypass — skip the Senior squad entirely.
 OESDEVTEAM_SENIOR_REVIEW_MODE=disabled python3 run_features.py <namespace>
 
-# Skip the Opus-backed adaptive domain brief (fall back to raw signals)
+# Skip the Opus-backed adaptive domain brief (falls back to raw signals).
 OESDEVTEAM_DOMAIN_BRIEF_DISABLED=1 python3 run_features.py <namespace>
+
+# Override the model for a single role (handy for A/B experiments).
+OESDEVTEAM_MODEL_SENIOR_BACKEND=claude-sonnet-4-6 python3 run_features.py <namespace>
 ```
 
 See [`docs/MIGRATION_PLAN.md`](docs/MIGRATION_PLAN.md) for the
