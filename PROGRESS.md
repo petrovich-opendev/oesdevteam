@@ -16,8 +16,8 @@ business goal?* If not — revert and reconsider.
 | 1 | Pin Opus 4.7 + model routing                  | P0       | ✅ done        |
 | 2 | 5 Senior Reviewers (BE/FE/Data/Perf/Business) | P0       | ✅ done        |
 | 3 | Blocking Code Review Gate                     | P0       | ✅ done        |
-| 4 | API Contract Gate (OpenAPI → TS)              | P1       | ⏳ next        |
-| 5 | DevOps SRE Review gate                        | P1       | ⏳ queued      |
+| 4 | API Contract Gate (OpenAPI → TS)              | P1       | ✅ done        |
+| 5 | DevOps SRE Review gate                        | P1       | ⏳ next        |
 | 6 | Langfuse + Cost budget enforce                | P1       | ⏳ queued      |
 | 7 | Stuck auto-escalation                         | P2       | ⏳ queued      |
 | 8 | Positive learning loop                        | P2       | ⏳ queued      |
@@ -162,3 +162,40 @@ system; with it, Opus 4.7 + per-role routing + five parallel reviewers
 become an actual quality barrier that refuses to ship bad code.
 Combined with Steps 1-2 the P0 sub-goal — *"block bad codegen from
 landing without manual intervention"* — is met.
+
+## Step 4 — API Contract Gate — done
+
+**Goal:** stop the frontend/backend contract-drift bug class (the
+classic "frontend says `username`, backend returns `telegram_chat_id`"
+outage). The gate blocks a feature if a Pydantic schema change
+arrives without a matching OpenAPI dump update, or if the OpenAPI
+dump changes without regenerated TypeScript types.
+
+**Delivered:**
+- `config/api_contract.yaml` — three pattern buckets (backend schema /
+  OpenAPI artefact / frontend types) as the single source of truth for
+  what counts as "contract surface". Namespace-local YAMLs can
+  override.
+- `src/gates/api_contract_gate.py` — `ApiContractConfig` (immutable
+  loaded patterns), `ApiContractGate` (checks two invariants),
+  `run_api_contract_gate` (function wrapper), `render_api_contract_report`
+  (emoji-free Markdown).
+- `tests/test_api_contract_gate.py` — 16 tests covering docs-only
+  applicability, all-synced pass, schema-without-openapi block,
+  openapi-without-types block, YAML loader error paths, function/class
+  equivalence, report rendering, emoji check.
+
+**Deliberate non-goal:** this gate does NOT semantically diff OpenAPI
+against TypeScript. Requiring the two artefacts to be co-committed is
+a cheap deterministic proxy; a deep semantic diff is a heavier problem
+for a later step.
+
+**Verification:**
+- `ruff check .` → clean
+- `ruff format --check .` → clean
+- `pytest -q` → 91 / 91 pass (+16 new)
+
+**Business-goal alignment:** ✅ closes one of the most expensive
+repeated failures from v1 — contract drift — without adding an LLM
+dependency. This is the kind of gate a pipeline must have to claim
+"production code without manual intervention".

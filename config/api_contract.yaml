@@ -1,0 +1,77 @@
+# ============================================================================
+# OESDevTeam — API Contract Gate — patterns
+# ============================================================================
+#
+# last_reviewed: 2026-04-21
+#
+# PURPOSE
+# -------
+# Describes which files belong to each side of a frontend/backend API
+# contract. The gate in `src/gates/api_contract_gate.py` uses these
+# glob-style patterns to detect contract drift in a feature's diff:
+#
+#   - If a backend schema file changes without the corresponding OpenAPI
+#     dump being regenerated, the gate blocks. Otherwise the classic
+#     "frontend says username, backend says telegram_chat_id" bug walks
+#     straight through.
+#
+#   - If the OpenAPI dump changes without the generated TypeScript types
+#     being refreshed, the gate blocks too — a stale types file silently
+#     mis-types every frontend caller.
+#
+# SCOPE
+# -----
+# Backend detection is limited to Python Pydantic models (the stack
+# declared in CLAUDE.md). When this project grows other backend stacks,
+# add a new `backend_schema` entry with its own patterns — the gate
+# reads each list independently.
+#
+# PATTERN SYNTAX
+# --------------
+# Patterns use fnmatch semantics (`*`, `**`, `?`, `[abc]`). They match
+# against paths normalised to forward slashes relative to the repo root.
+# Keep patterns conservative: a false positive is cheap (one extra
+# commit), a false negative is a production bug.
+#
+# OVERRIDES
+# ---------
+# A project can ship its own `api_contract.yaml` in its namespace
+# (e.g. `namespaces/dev/biocoach/api_contract.yaml`). The gate prefers
+# the namespace-specific file when present; fallback is this one.
+# ============================================================================
+
+version: 1
+
+# Files whose change signals that the backend contract MIGHT have moved.
+# Matching these alone does NOT block — a BaseModel rename might be
+# rename-only with no schema impact. The gate only blocks if these
+# change AND the OpenAPI artefact did not change with them.
+backend_schema:
+  patterns:
+    - "**/schemas.py"       # common FastAPI convention
+    - "**/schemas/*.py"
+    - "**/models.py"        # Pydantic models kept next to routes
+    - "**/api/**/*.py"      # catch-all for backend API packages
+    - "**/routes/**/*.py"   # FastAPI routes carry response_model annotations
+
+# The generated/checked-in OpenAPI artefact. Adding or removing routes
+# must update this file; the gate enforces it.
+openapi_artefact:
+  patterns:
+    - "openapi.json"
+    - "openapi.yaml"
+    - "openapi.yml"
+    - "**/openapi.json"
+    - "**/openapi.yaml"
+    - "**/openapi.yml"
+
+# Generated TypeScript types. After an OpenAPI change the frontend
+# types must be regenerated (e.g. via openapi-typescript) and committed
+# in the same PR.
+frontend_types:
+  patterns:
+    - "**/api-types.ts"
+    - "**/api-types.d.ts"
+    - "**/generated/**/*.ts"
+    - "**/openapi-types.ts"
+    - "frontend/src/types/api.ts"

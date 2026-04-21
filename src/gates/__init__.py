@@ -22,14 +22,22 @@ Tests live in ``tests/test_<gate>.py`` with one test class per gate.
 
 from __future__ import annotations
 
+from .api_contract_gate import (
+    ApiContractConfig,
+    ApiContractGate,
+    run_api_contract_gate,
+)
 from .base import Gate, GateInput, GateResult, format_gate_report
 from .code_review_gate import CodeReviewGate, run_code_review_gate
 
 __all__ = [
+    "ApiContractConfig",
+    "ApiContractGate",
     "CodeReviewGate",
     "Gate",
     "GateInput",
     "GateResult",
     "format_gate_report",
+    "run_api_contract_gate",
     "run_code_review_gate",
 ]
