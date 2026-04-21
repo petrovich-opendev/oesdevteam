@@ -19,8 +19,8 @@ business goal?* If not — revert and reconsider.
 | 4 | API Contract Gate (OpenAPI → TS)              | P1       | ✅ done        |
 | 5 | DevOps SRE Review gate                        | P1       | ✅ done        |
 | 6 | Langfuse + Cost budget enforce                | P1       | ✅ done        |
-| 7 | Stuck auto-escalation                         | P2       | ⏳ next        |
-| 8 | Positive learning loop                        | P2       | ⏳ queued      |
+| 7 | Stuck auto-escalation                         | P2       | ✅ done        |
+| 8 | Positive learning loop                        | P2       | ✅ done        |
 
 ## Step 1 — Pin Opus 4.7 + model routing — ✅ done
 
@@ -248,3 +248,35 @@ outages. Now a feature that adds a Dockerfile, migration, or k8s
 manifest is held to the same "no ambiguous silent pass" standard as
 application code — required for autonomous codegen that actually
 deploys, not just compiles.
+
+## Step 6 — Langfuse + Cost budget enforce — done
+
+Added `src/observability/`: `CostTracker` (aggregate USD per feature,
+`BudgetExceeded` on hard-cap breach, soft-warning threshold) and the
+optional Langfuse exporter with a graceful `NullExporter` fallback.
+Closes the runaway-spend vector where per-call caps silently sum into
+unbounded aggregate cost. 18 tests; 124/124 total.
+
+## Step 7 — Stuck auto-escalation — done
+
+`src/controller/escalation.py`: deterministic Markdown report generator
+for features that exhaust their retry budget. Surfaces gate-frequency
+analysis, repeated-blocker highlighting, and rule-based next-step
+suggestions. No LLM in the base path — report builds from data already
+on disk.
+
+## Step 8 — Positive learning loop — done
+
+`src/controller/learning.py`: `extract_success_pattern` +
+`append_success_pattern` + `load_memory_blob`. Pipeline now learns
+from wins as well as failures — successful features append a stanza
+to `success_patterns.md`, and the controller embeds both lessons and
+patterns into every agent's system prompt before a run. Tail-sliced
+so a bloated memory file cannot eat the agent's context.
+
+Total verification:
+- `ruff check .` → clean
+- `ruff format --check .` → clean
+- `pytest -q` → **149 / 149 pass**
+
+All 8 blocks of the v2 roadmap are complete.
