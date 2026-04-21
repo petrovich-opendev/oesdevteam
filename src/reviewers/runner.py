@@ -38,11 +38,7 @@ def _unwrap_claude_cli_envelope(stdout: str) -> tuple[str, float]:
         envelope = json.loads(stdout)
     except json.JSONDecodeError:
         return stdout, 0.0
-    if (
-        isinstance(envelope, dict)
-        and envelope.get("type") == "result"
-        and "result" in envelope
-    ):
+    if isinstance(envelope, dict) and envelope.get("type") == "result" and "result" in envelope:
         inner = envelope.get("result", "") or ""
         cost = float(envelope.get("cost_usd", 0.0) or 0.0)
         return inner, cost
@@ -101,6 +97,18 @@ class ClaudeCliReviewerRunner:
         # Cost of the most recent call, unwrapped from the Claude CLI
         # envelope. Read after ``run`` returns. 0.0 when unavailable.
         self.last_call_cost_usd: float = 0.0
+        # Aggregate cost across this runner instance's lifetime.
+        # Per-gate orchestrators sum per-call entries from call_log.
+        self.total_cost_usd: float = 0.0
+        # Per-call ledger: list of (role.value, cost_usd). Cleared by
+        # reset_cost_log() between unrelated gate invocations.
+        self.call_log: list[tuple[str, float]] = []
+
+    def reset_cost_log(self) -> None:
+        """Zero the aggregate cost and per-call ledger."""
+        self.last_call_cost_usd = 0.0
+        self.total_cost_usd = 0.0
+        self.call_log = []
 
     async def run(self, *, role: AgentRole, system_prompt: str, task: str) -> str:
         """Launch Claude CLI for one reviewer; return the reviewer's JSON text.
@@ -154,6 +162,8 @@ class ClaudeCliReviewerRunner:
 
         inner, cost = _unwrap_claude_cli_envelope(stdout)
         self.last_call_cost_usd = cost
+        self.total_cost_usd += cost
+        self.call_log.append((role.value, cost))
         return inner
 
 

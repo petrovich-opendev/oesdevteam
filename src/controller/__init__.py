@@ -12,6 +12,7 @@ so the port can compose them without reinventing the surface.
 
 from __future__ import annotations
 
+from .domain_context import build_domain_context
 from .escalation import (
     AttemptRecord,
     FeatureEscalation,
@@ -30,6 +31,7 @@ __all__ = [
     "FeatureEscalation",
     "SuccessPattern",
     "append_success_pattern",
+    "build_domain_context",
     "extract_success_pattern",
     "generate_escalation_report",
     "load_memory_blob",

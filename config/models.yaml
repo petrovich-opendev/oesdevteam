@@ -155,3 +155,8 @@ profiles:
     model: claude-sonnet-4-6
     max_cost_usd: 0.25
     rationale: "Structured failure-cause summary fed into retry attempts."
+
+  domain_brief:
+    model: claude-opus-4-7
+    max_cost_usd: 0.25
+    rationale: "Business framing is the most important step in any task — deep reasoning (Opus) justified. Cached per namespace; regenerated only when inputs change."
