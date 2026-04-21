@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project artefacts (not in git — survive reverts, rebuilt at runtime)
+features.json
+.pipeline.lock
+logs/
+pipeline-log/
+test-results/
+audit_reports/
+*.log
+
+# Secrets — never commit
+.env
+.env.local
+*.pem
+*.key
+credentials.json
+
+# Node (UX checker)
+node_modules/
+package-lock.json

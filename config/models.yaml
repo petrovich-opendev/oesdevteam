@@ -1,0 +1,152 @@
+# ============================================================================
+# OESDevTeam — Central LLM Model Routing
+# ============================================================================
+#
+# last_reviewed: 2026-04-21
+#
+# PURPOSE
+# -------
+# Single source of truth for which LLM model every agent role uses. No role
+# relies on the Claude CLI's global default. This file is the only place where
+# model identifiers appear — source code reads the mapping via
+# `src.config.get_model_for_role()`.
+#
+# WHY EXPLICIT PINNING
+# --------------------
+# In v1 of DevTeam the worker simply called `claude -p ...` and inherited
+# whatever model the user had set globally. That meant:
+#   - two contributors on two machines produced DIFFERENT output quality;
+#   - "works on my machine" silently regressed review quality;
+#   - reproducibility of `pipeline-log/*.jsonl` was fiction.
+# Pinning each role to a specific full model name (with per-call overrides)
+# makes the pipeline reproducible and reviewable.
+#
+# MODEL NAMING CONVENTION
+# -----------------------
+# We use stable full model names (e.g. `claude-opus-4-7`, `claude-sonnet-4-6`,
+# `claude-haiku-4-5`) — NOT short aliases (`opus`, `sonnet`) and NOT dated
+# snapshots (`claude-opus-4-7-20260115`). Rationale:
+#   - Full names document the model FAMILY and VERSION — reviewers can tell
+#     `opus-4-7` apart from `opus-4-6` in a git diff without opening docs.
+#   - Bumping a version is a deliberate commit that shows up in blame —
+#     unlike short aliases, which silently float.
+#   - Dated snapshots offer bit-for-bit reproducibility, but at the cost of
+#     a stale commit every few weeks. For this project the audit trail via
+#     Langfuse is the primary reproducibility mechanism; the YAML captures
+#     *intent*. Upgrade to dated snapshots in this file only if bit-level
+#     determinism becomes a hard requirement.
+#
+# TIERING RATIONALE
+# -----------------
+# Opus 4.7   — deepest reasoning. Used for creative / critical work:
+#              Developer, Architect, all five Senior Reviewers, Business Expert.
+# Sonnet 4.6 — fast and cheap. Used for mechanical checks that don't need
+#              deep reasoning: QA verification, the verifier-agent, UX smoke.
+# Haiku 4.5  — lightweight classifier. Used ONLY for drift detection's
+#              A/B/C/D labelling (see src/drift_detector.py).
+#
+# COST ENFORCEMENT
+# ----------------
+# `max_cost_usd` is a per-call hard ceiling in US dollars. It is passed to the
+# CLI as `--max-budget-usd <amount>`; Claude Code aborts the session rather
+# than exceeding it. This is distinct from `TaskBudget.max_cost_usd` in
+# src/models.py, which is the aggregate ceiling across all invocations for
+# one task (typically 3-5× the per-call ceiling).
+#
+# OVERRIDES
+# ---------
+# At runtime, set `OESDEVTEAM_MODEL_<ROLE_UPPER>` to override a single role.
+# Example: OESDEVTEAM_MODEL_DEVELOPER=claude-sonnet-4-6 for a cheap dry-run.
+# ============================================================================
+
+version: 1
+
+# Default per-role routing. Keys MUST match `AgentRole` enum values in
+# src/models.py (lowercase snake_case) — validated on load.
+roles:
+  # Core production roles — deep reasoning required
+  developer:
+    model: claude-opus-4-7
+    max_cost_usd: 2.00
+    rationale: "Writes production code. Highest-quality output justifies cost."
+
+  architect:
+    model: claude-opus-4-7
+    max_cost_usd: 1.50
+    rationale: "Designs solutions. One bad design wastes many downstream runs."
+
+  po:
+    model: claude-opus-4-7
+    max_cost_usd: 0.75
+    rationale: "Requirements decomposition — ambiguity here cascades everywhere."
+
+  # Senior Reviewer squad — each must catch issues peers missed; deep model
+  senior_backend:
+    model: claude-opus-4-7
+    max_cost_usd: 1.00
+    rationale: "Spots async bugs, SQL injection, contract drift. Deep review."
+
+  senior_frontend:
+    model: claude-opus-4-7
+    max_cost_usd: 1.00
+    rationale: "Catches a11y regressions, re-render bugs, bundle bloat."
+
+  senior_data:
+    model: claude-opus-4-7
+    max_cost_usd: 1.00
+    rationale: "Idempotency, partition keys, unit-of-measure violations."
+
+  senior_performance:
+    model: claude-opus-4-7
+    max_cost_usd: 1.00
+    rationale: "Query plans, Big-O, memory profiling, Core Web Vitals."
+
+  business_expert:
+    model: claude-opus-4-7
+    max_cost_usd: 0.75
+    rationale: "Domain terminology enforcement, actionable-insight framing."
+
+  # Execution roles — benefit from deep reasoning but not always critical
+  devops:
+    model: claude-opus-4-7
+    max_cost_usd: 1.50
+    rationale: "Deploy mistakes are expensive to reverse — use deepest model."
+
+  appsec:
+    model: claude-opus-4-7
+    max_cost_usd: 1.00
+    rationale: "Security findings directly block commits; false negatives cost."
+
+  # Lightweight roles — fast model suffices
+  qa:
+    model: claude-sonnet-4-6
+    max_cost_usd: 0.50
+    rationale: "Runs verification commands, reports results. Mechanical."
+
+  ux_reviewer:
+    model: claude-sonnet-4-6
+    max_cost_usd: 0.50
+    rationale: "Reads Playwright screenshots, checks flow. Fast enough."
+
+  support:
+    model: claude-sonnet-4-6
+    max_cost_usd: 0.30
+    rationale: "Chores / cleanup. Doesn't need top-tier reasoning."
+
+# Named utility profiles (not tied to an AgentRole).
+# Referenced by name from source code: get_model_for_profile('drift_classifier')
+profiles:
+  verifier:
+    model: claude-sonnet-4-6
+    max_cost_usd: 0.30
+    rationale: "Separate-context verifier. Pass/fail judgement, not synthesis."
+
+  drift_classifier:
+    model: claude-haiku-4-5
+    max_cost_usd: 0.05
+    rationale: "A/B/C/D drift labelling. Pure classification — Haiku is ideal."
+
+  reflection:
+    model: claude-sonnet-4-6
+    max_cost_usd: 0.25
+    rationale: "Structured failure-cause summary fed into retry attempts."

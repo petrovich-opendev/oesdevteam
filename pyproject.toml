@@ -1,0 +1,79 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "oesdevteam"
+version = "0.1.0"
+description = "Production-grade multi-agent code generation pipeline"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+authors = [{ name = "OESDevTeam contributors" }]
+keywords = ["multi-agent", "llm", "code-generation", "claude", "nats"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Code Generators",
+]
+dependencies = [
+    "pydantic>=2.5",
+    "pyyaml>=6.0",
+    "nats-py>=2.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.3",
+]
+
+[project.urls]
+Homepage = "https://github.com/oesdevteam/oesdevteam"
+Issues = "https://github.com/oesdevteam/oesdevteam/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+# --- Tooling ------------------------------------------------------------------
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# We intentionally opt in to a focused rule set instead of "everything".
+# Why: this repo is a reference implementation — obscure rules create noise
+# for readers who are trying to learn the codebase.
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear (common mistakes)
+    "SIM",  # flake8-simplify
+    "D",    # pydocstyle — docstrings are mandatory
+]
+ignore = [
+    "D100",  # Missing module docstring — we require them but some modules are minimal
+    "D104",  # Missing docstring in public package (__init__.py)
+    "D203",  # 1 blank line before class docstring (conflicts with D211)
+    "D213",  # Multi-line summary on second line (conflicts with D212)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["D"]  # Test docstrings are helpful but not enforced
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
