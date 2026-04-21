@@ -14,8 +14,8 @@ business goal?* If not — revert and reconsider.
 | # | Block                                         | Priority | Status        |
 |---|-----------------------------------------------|----------|---------------|
 | 1 | Pin Opus 4.7 + model routing                  | P0       | ✅ done        |
-| 2 | 5 Senior Reviewers (BE/FE/Data/Perf/Business) | P0       | ⏳ next        |
-| 3 | Blocking Code Review Gate                     | P0       | ⏳ queued      |
+| 2 | 5 Senior Reviewers (BE/FE/Data/Perf/Business) | P0       | ✅ done        |
+| 3 | Blocking Code Review Gate                     | P0       | ⏳ next        |
 | 4 | API Contract Gate (OpenAPI → TS)              | P1       | ⏳ queued      |
 | 5 | DevOps SRE Review gate                        | P1       | ⏳ queued      |
 | 6 | Langfuse + Cost budget enforce                | P1       | ⏳ queued      |
@@ -66,8 +66,51 @@ different global default would produce different (possibly worse) output.
 Explicit model pinning plus a per-call dollar ceiling is a prerequisite for
 reproducible, budgeted, auditable codegen. ✅
 
-## Step 2 — Senior Reviewer squad (next)
+## Step 2 — Senior Reviewer squad — ✅ done
 
-Spawn five reviewer agents (Backend / Frontend / Data / Performance /
-Business) in parallel. Produce structured findings; aggregate into a gate
-decision in Step 3.
+**Goal:** replace the single ARCHITECT-review of v1 with five specialised
+Senior Reviewers running in parallel and producing structured findings.
+
+**Delivered:**
+- `prompts/reviewers/*.md` — five production-grade review prompts
+  (Senior Backend, Senior Frontend, Senior Data, Senior Performance,
+  Business Expert) with explicit JSON output contract, severity
+  calibration, and prompt-injection resistance rules.
+- `src/reviewers/findings.py` — `Finding`, `ReviewResult`, `SquadResult`,
+  `parse_review_response`. Parser tolerates fenced JSON and chatty
+  prose; unparseable responses become `reviewer_fault` (MAJOR), never a
+  silent approve.
+- `src/reviewers/runner.py` — `ReviewerRunner` Protocol,
+  `ClaudeCliReviewerRunner` (real subprocess), `MockReviewerRunner`
+  (tests).
+- `src/reviewers/squad.py` — `run_reviewer_squad` with asyncio.gather,
+  per-reviewer and whole-squad timeouts, duplicate-role rejection,
+  sentinel-wrapped prompt-injection isolation.
+- Business Expert prompt reads `{{domain_context}}` pulled from
+  `namespaces/<env>/<domain>/CLAUDE.md` — domain-pluggable without code
+  changes.
+
+**Self-review adjustments (post-critic pass):**
+- Prompt-injection hardening: every untrusted field wrapped in
+  `<<<UNTRUSTED_DATA_BEGIN>>>` / `<<<UNTRUSTED_DATA_END>>>` sentinels,
+  preamble instructs the reviewer to ignore instructions inside
+  sentinels and flag such attempts as BLOCKER `prompt_injection_attempt`.
+- Squad-level wall-time cap (`DEFAULT_SQUAD_TIMEOUT_SECONDS = 600`)
+  with graceful cancellation → reviewer_fault fallback for every
+  unfinished reviewer.
+- Duplicate-role guard in `run_reviewer_squad`.
+- Senior Backend prompt's verdict rule simplified to match
+  `SquadResult.aggregate_verdict` (any blocker or major → needs_rework).
+
+**Verification:**
+- `ruff check .` → clean
+- `ruff format --check .` → clean
+- `pytest -q` → 61 / 61 pass (54 existing + 7 new for Step 2 hardening)
+
+**Business-goal alignment:** an autonomous pipeline cannot "generate
+production code without manual intervention" if there is no reviewer
+strong enough to block bad code. Five specialised reviewers running in
+parallel with a pessimistic aggregator is what replaces the human PR
+reviewer the v1 pipeline implicitly assumed. Step 3 will wire this
+squad into the pre-commit gate so the verdict actually stops broken
+code from landing. ✅
