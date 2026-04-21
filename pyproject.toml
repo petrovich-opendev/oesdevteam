@@ -34,8 +34,8 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/oesdevteam/oesdevteam"
-Issues = "https://github.com/oesdevteam/oesdevteam/issues"
+Homepage = "https://github.com/petrovich-opendev/oesdevteam"
+Issues = "https://github.com/petrovich-opendev/oesdevteam/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -1,6 +1,6 @@
 # OESDevTeam
 
-[![CI](https://img.shields.io/github/actions/workflow/status/REPLACE_ME/oesdevteam/ci.yml?branch=main&label=ci)](https://github.com/REPLACE_ME/oesdevteam/actions)
+[![CI](https://img.shields.io/github/actions/workflow/status/petrovich-opendev/oesdevteam/ci.yml?branch=main&label=ci)](https://github.com/petrovich-opendev/oesdevteam/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](pyproject.toml)
 [![Model](https://img.shields.io/badge/LLM-Claude%20Opus%204.7-8A2BE2)](config/models.yaml)
@@ -64,7 +64,7 @@ outgrew its advisory-only review stage.
 
 ```bash
 # Prerequisites: Python 3.11+, Claude Code CLI, NATS JetStream (optional), git
-git clone https://github.com/REPLACE_ME/oesdevteam.git
+git clone https://github.com/petrovich-opendev/oesdevteam.git
 cd oesdevteam
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
