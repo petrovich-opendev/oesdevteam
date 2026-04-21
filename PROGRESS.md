@@ -15,8 +15,8 @@ business goal?* If not — revert and reconsider.
 |---|-----------------------------------------------|----------|---------------|
 | 1 | Pin Opus 4.7 + model routing                  | P0       | ✅ done        |
 | 2 | 5 Senior Reviewers (BE/FE/Data/Perf/Business) | P0       | ✅ done        |
-| 3 | Blocking Code Review Gate                     | P0       | ⏳ next        |
-| 4 | API Contract Gate (OpenAPI → TS)              | P1       | ⏳ queued      |
+| 3 | Blocking Code Review Gate                     | P0       | ✅ done        |
+| 4 | API Contract Gate (OpenAPI → TS)              | P1       | ⏳ next        |
 | 5 | DevOps SRE Review gate                        | P1       | ⏳ queued      |
 | 6 | Langfuse + Cost budget enforce                | P1       | ⏳ queued      |
 | 7 | Stuck auto-escalation                         | P2       | ⏳ queued      |
@@ -114,3 +114,51 @@ parallel with a pessimistic aggregator is what replaces the human PR
 reviewer the v1 pipeline implicitly assumed. Step 3 will wire this
 squad into the pre-commit gate so the verdict actually stops broken
 code from landing. ✅
+
+## Step 3 — Blocking Code Review Gate — done
+
+**Goal:** make the Senior squad's verdict *binding*. v1 had a reviewer
+whose opinion was advisory; v2 enforces it as a pre-commit gate that
+refuses to merge when the squad reports blockers or a ``needs_rework``
+verdict.
+
+**Delivered:**
+- `src/gates/base.py` — abstract `Gate` Protocol, shared `GateInput` /
+  `GateResult` schemas, `format_gate_report` header renderer. Ready to
+  carry the API-contract (Step 4) and SRE-review (Step 5) gates without
+  interface churn.
+- `src/gates/code_review_gate.py` — `CodeReviewGate` class and
+  `run_code_review_gate` function wrap the squad from Step 2; passes
+  iff `aggregate_verdict == APPROVE`. `render_code_review_report`
+  produces plain-Markdown reports (no emoji) suitable for CI logs and
+  GitHub comments.
+- `tests/test_code_review_gate.py` — 14 tests covering happy path,
+  blocker path, majors-only path, reviewer fault, report rendering,
+  contract with the aggregate verdict.
+
+**Self-review adjustments (post-critic pass):**
+- Fixed `_format_block_reason` to pick the representative finding from
+  blockers+majors only (previously `all_findings()[0]` could have
+  chosen a minor in degenerate cases).
+- Strengthened the majors-only test — asserts `aggregate_verdict`,
+  `blockers` count, and summary text in the reason line rather than
+  a loose substring match.
+- Typed `roles: tuple[AgentRole, ...]` instead of bare `tuple`.
+- Replaced emoji report headers with `[PASS]` / `[BLOCK]` per
+  project style rules.
+- Documented `allow_retry=True` as a hint — the controller remains
+  responsible for bounding retries and discriminating
+  reviewer_fault (transient) vs. real blocker (persistent).
+- Added business-context comment to `DEFAULT_GATE_TIMEOUT_SECONDS`.
+
+**Verification:**
+- `ruff check .` → clean
+- `ruff format --check .` → clean
+- `pytest -q` → 75 / 75 pass (61 prior + 14 new)
+
+**Business-goal alignment:** ✅ step 3 closes the last P0 gap. Without
+a binding gate the five Senior Reviewers are an elaborate advisory
+system; with it, Opus 4.7 + per-role routing + five parallel reviewers
+become an actual quality barrier that refuses to ship bad code.
+Combined with Steps 1-2 the P0 sub-goal — *"block bad codegen from
+landing without manual intervention"* — is met.
