@@ -71,6 +71,32 @@ discussion; a missed injection bug can cost the business.
   worst case is "DB is totally down" — prefer a cheap real query for
   critical services).
 
+### External data resilience (brokers, SCADA, FMS, OPC-UA, vendor telemetry)
+Full rule set: `docs/RESILIENCE_RULES.md`. Quick checklist — any hit here
+is a BLOCKER or MAJOR per that document:
+
+- R-1: Every incoming message parsed through a Pydantic model at the
+  boundary. `json.loads` + `data["field"]` in a consumer is a **BLOCKER**
+  — one malformed message will crash the worker.
+- R-2: Every drop path writes a counter, logs at WARNING level, and the
+  consumer keeps running. Silent drop = **BLOCKER**.
+- R-4: No SCADA/FMS tag name hardcoded in Python. Renames happen on
+  every firmware upgrade — expect a tag-mapping config
+  (`config/tag_mappings.yaml` or equivalent). Hardcoded vendor tag =
+  **BLOCKER** for an industrial consumer.
+- R-5: Pydantic models for external messages use `extra="ignore"` so a
+  new vendor field does not crash an unrelated consumer. `extra="forbid"`
+  without a written justification = **MAJOR**.
+- R-6: Broker / SCADA client implements bounded reconnect (exponential
+  backoff, cap ≤ 30 s) + circuit breaker; state visible on the health
+  endpoint. Unbounded retry loop = **BLOCKER**.
+- R-11: A dropped message must NOT trigger any downstream side effect
+  (no partial DB row, no best-guess event). A drop path that calls
+  `db.insert()` or emits a NATS event = **BLOCKER**.
+- R-12: Failure-path tests present: malformed JSON dropped, missing
+  required tag dropped, circuit breaker opens on N failures. Missing =
+  **BLOCKER** for an industrial consumer.
+
 ## Output format (MANDATORY)
 
 Return a **single JSON object** and nothing else. No prose before or

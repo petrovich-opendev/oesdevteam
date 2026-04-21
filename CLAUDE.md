@@ -99,6 +99,17 @@ If any gate fails, the feature enters `needs_rework` with structured feedback
 for the next attempt. After `max_attempts` retries, the feature is escalated
 with a root-cause report.
 
+## External data resilience (HARD RULE)
+
+Any code that consumes messages from an external system — brokers
+(Kafka / NATS / MQTT / RabbitMQ), SCADA, FMS, OPC-UA, ModBus, vendor
+telemetry — obeys `docs/RESILIENCE_RULES.md` (R-1 … R-12). No
+single malformed message, renamed tag, or transient connection blip
+may take the service down. Worst allowed outcome is "drop the
+message, increment a counter, surface via health check, keep
+consuming". Senior Backend, Senior Data, and Senior SRE reviewers
+enforce this; violations are BLOCKER or MAJOR per the rule document.
+
 ## What NOT to do
 
 - Do NOT use Go — Python only.
@@ -107,3 +118,8 @@ with a root-cause report.
 - Do NOT let an LLM perform arithmetic — code computes, LLM interprets.
 - Do NOT hardcode domain-specific logic in `src/`.
 - Do NOT write a fallback that silently hides an error — fail loudly.
+- Do NOT hardcode external vendor tag names (SCADA / FMS / OPC-UA) in
+  Python — they belong in a tag-mapping config. Violation = BLOCKER.
+- Do NOT deploy a consumer without `messages_dropped_total{reason}`
+  metric and drop-rate signal in the health endpoint — the service
+  becomes operationally blind.

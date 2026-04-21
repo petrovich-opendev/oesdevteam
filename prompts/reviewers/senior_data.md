@@ -70,6 +70,28 @@ rows.
 - Never share `idles_fact` between `trips_v1` and `downtime_v1` — each
   domain gets an isolated table even if data is structurally similar.
 
+### External data resilience (SCADA / FMS / broker ingest pipelines)
+Full rule set: `docs/RESILIENCE_RULES.md`. Data-layer specifics:
+
+- R-4: External tag names (SCADA PLC tags, FMS dispatch events, OPC-UA
+  nodes) MUST NOT appear as Python string literals in ETL code. They
+  belong in a mapping config so a vendor rename is a one-file change.
+  Hardcoded external tag = **BLOCKER**.
+- R-5: Ingest tables tolerate NEW source columns (pipeline ignores
+  unknown fields and logs at INFO level the first time each is seen).
+  A pipeline that crashes on "new column in source" = **MAJOR**.
+- R-9: UTC-only in storage, both `source_ts` and `received_ts` kept as
+  separate columns. Naive `datetime.now()` anywhere near ingest =
+  **MAJOR**. Missing drift guard (future-dated messages not dropped)
+  = **MAJOR** — one misconfigured device will poison time-windowed
+  aggregations.
+- R-10: `messages_received_total`, `messages_dropped_total{reason}`,
+  and `last_successful_receive_ts` exist as metrics. Ingest without
+  those = operationally blind = **MAJOR**.
+- R-11: Malformed rows drop completely; never write partial records
+  to the analytics table as a "best effort" — that poisons queries
+  forever. Partial write on parse failure = **BLOCKER**.
+
 ### Readability (hard project rule)
 - SQL: lowercase keywords, snake_case tables/columns, comments for any
   non-obvious filter or CTE.

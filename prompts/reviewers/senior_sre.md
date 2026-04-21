@@ -55,6 +55,32 @@ degrades, how it unwinds.
 - Readiness (k8s) separate from liveness where applicable.
 - Startup probe handles slow first-call warmup.
 
+### External data resilience (brokers / SCADA / FMS integrations)
+Full rule set: `docs/RESILIENCE_RULES.md`. SRE-layer specifics:
+
+- R-3: Health endpoint MUST reflect drop rate. A consumer returning
+  `200 OK` while 95% of messages are dropped is lying to on-call.
+  Expect `status: ok|degraded|down` derived from
+  `messages_dropped_total / messages_received_total` over a recent
+  window, plus `last_successful_receive` timestamp. Missing = **MAJOR**.
+- R-6: Broker / SCADA client exposes circuit-breaker state in health
+  output. A never-ending retry loop with no visibility on-call can
+  watch = **BLOCKER**.
+- R-7: Ingest queue is bounded; overflow increments a drop counter and
+  a queue-depth gauge is exported. Unbounded `asyncio.Queue()` =
+  **MAJOR**; unbounded + no drop metric = **BLOCKER** (will OOM a
+  worker under traffic spike).
+- R-8: If a DLQ exists, its policy (size limit, retention, replay
+  procedure) is written in the architecture doc and its depth is a
+  Prometheus metric. Undocumented DLQ that grows unboundedly =
+  **MAJOR**.
+- R-10: Minimum counters present: `messages_received_total`,
+  `messages_dropped_total{reason}`, `messages_accepted_total`,
+  `ingest_queue_depth`, `broker_connection_state`,
+  `last_successful_receive_ts`. Missing `messages_dropped_total`
+  specifically = **BLOCKER** — operators cannot distinguish "broker is
+  down" from "messages are being silently dropped".
+
 ### Observability
 - New code emits at least one log line per important path, with a
   correlation id where a request is in scope.

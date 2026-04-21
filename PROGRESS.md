@@ -21,6 +21,7 @@ business goal?* If not — revert and reconsider.
 | 6 | Langfuse + Cost budget enforce                | P1       | ✅ done        |
 | 7 | Stuck auto-escalation                         | P2       | ✅ done        |
 | 8 | Positive learning loop                        | P2       | ✅ done        |
+| 9 | External data resilience rules (broker/SCADA/FMS) | +     | ✅ done        |
 
 ## Step 1 — Pin Opus 4.7 + model routing — ✅ done
 
@@ -280,3 +281,45 @@ Total verification:
 - `pytest -q` → **149 / 149 pass**
 
 All 8 blocks of the v2 roadmap are complete.
+
+## Step 9 — External data resilience rules — done (bonus)
+
+**Why added:** industrial reality. Generated code that consumes from
+brokers (Kafka / NATS / MQTT), SCADA, FMS, OPC-UA, or vendor
+telemetry must tolerate malformed messages, renamed tags, connection
+blips, and backpressure. A consumer that crashes on a vendor tag
+rename is not "production without manual intervention" — it is
+production outages without manual intervention.
+
+**Delivered:**
+- `docs/RESILIENCE_RULES.md` — 12 canonical rules (R-1 … R-12) with
+  rationale, code examples (good vs bad), and severity calibration.
+  Covers Pydantic-boundary validation, drop-count-log discipline,
+  health-check drop-rate signal, schema evolution / tag-mapping
+  configs, `extra="ignore"` policy, bounded retry + circuit breaker,
+  bounded queues + backpressure, DLQ policy, UTC + timestamp-drift
+  guard, observable counters, no business logic on the drop path,
+  failure-path test coverage.
+- `prompts/reviewers/senior_backend.md` — new "External data
+  resilience" section citing R-1, R-2, R-4, R-5, R-6, R-11, R-12.
+- `prompts/reviewers/senior_data.md` — new "External data resilience"
+  section citing R-4, R-5, R-9, R-10, R-11 focused on ETL ingest.
+- `prompts/reviewers/senior_sre.md` — new "External data resilience"
+  section citing R-3, R-6, R-7, R-8, R-10 focused on health /
+  connection-state / queue / DLQ visibility.
+- `CLAUDE.md` — hard rule added: no hardcoded external tag names, no
+  deploy without `messages_dropped_total` metric.
+- `tests/test_resilience_rules.py` — 15 tests enforcing rule-document
+  presence, reviewer-prompt referencing, severity calibration, and
+  CLAUDE.md hard-rule section.
+
+**Verification:**
+- `ruff check .` → clean
+- `ruff format --check .` → clean
+- `pytest -q` → **164 / 164 pass** (+15 new)
+
+**Business-goal alignment:** ✅ closes the largest remaining
+production-failure vector for industrial deployments. A generated
+consumer that ignores any of the 12 rules will be flagged as a
+BLOCKER or MAJOR by at least one of Backend / Data / SRE reviewers
+before it can merge.
