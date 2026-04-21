@@ -18,8 +18,8 @@ business goal?* If not — revert and reconsider.
 | 3 | Blocking Code Review Gate                     | P0       | ✅ done        |
 | 4 | API Contract Gate (OpenAPI → TS)              | P1       | ✅ done        |
 | 5 | DevOps SRE Review gate                        | P1       | ✅ done        |
-| 6 | Langfuse + Cost budget enforce                | P1       | ⏳ next        |
-| 7 | Stuck auto-escalation                         | P2       | ⏳ queued      |
+| 6 | Langfuse + Cost budget enforce                | P1       | ✅ done        |
+| 7 | Stuck auto-escalation                         | P2       | ⏳ next        |
 | 8 | Positive learning loop                        | P2       | ⏳ queued      |
 
 ## Step 1 — Pin Opus 4.7 + model routing — ✅ done
