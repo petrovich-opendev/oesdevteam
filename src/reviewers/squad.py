@@ -155,6 +155,22 @@ def _fence(label: str, body: str) -> str:
     return f"{_DATA_SENTINEL_BEGIN} ({label})\n{body}\n{_DATA_SENTINEL_END} ({label})"
 
 
+# Hard ceiling on a single reviewer task message — kept well under Linux
+# MAX_ARG_STRLEN (128 KB per argv entry). The `claude -p <task>` call passes
+# the whole task as one argument; exceeding the kernel limit raises
+# OSError(7) at execve() time and every reviewer in the squad fails with
+# an opaque `reviewer_fault @ <reviewer-infrastructure>`. Real-world cause
+# observed in production: a project worktree with unignored node_modules/
+# (13 000+ paths) inflated the files-list portion of the message to ~900 KB.
+_TASK_MAX_BYTES = 120_000
+_TRUNCATION_MARKER = (
+    "\n\n[... TRUNCATED for kernel ARG limits — "
+    "{omitted} bytes removed from the tail. "
+    "The diff is the field most likely truncated; "
+    "reviewer may flag scope ambiguity.]\n"
+)
+
+
 def build_task_message(review_input: ReviewInput) -> str:
     """Assemble the user-message half of a reviewer call.
 
@@ -163,6 +179,10 @@ def build_task_message(review_input: ReviewInput) -> str:
     untrusted content (diff, goal text, file list, etc.) is wrapped in
     sentinel delimiters and prefaced by an anti-injection preamble so a
     malicious PR cannot hijack the verdict.
+
+    The final message is hard-capped at ``_TASK_MAX_BYTES`` to stay under
+    Linux MAX_ARG_STRLEN; overflow is replaced by an explicit marker the
+    reviewer can reason about instead of an OSError(7) at execve().
     """
     parts: list[str] = [_INJECTION_PREAMBLE, ""]
     parts.append(f"# Feature under review (id: `{review_input.feature_id}`)")
@@ -191,7 +211,18 @@ def build_task_message(review_input: ReviewInput) -> str:
         "",
         "Produce your review per the JSON schema in your system prompt.",
     ]
-    return "\n".join(parts)
+    message = "\n".join(parts)
+
+    if len(message.encode("utf-8")) > _TASK_MAX_BYTES:
+        # Truncate by bytes (UTF-8 safe): keep the head, append marker.
+        raw = message.encode("utf-8")
+        # Reserve ~200 bytes for the marker itself.
+        keep = _TASK_MAX_BYTES - 200
+        # Drop back to a codepoint boundary to avoid mid-character splits.
+        truncated = raw[:keep].decode("utf-8", errors="ignore")
+        message = truncated + _TRUNCATION_MARKER.format(omitted=len(raw) - keep)
+
+    return message
 
 
 # -----------------------------------------------------------------------------

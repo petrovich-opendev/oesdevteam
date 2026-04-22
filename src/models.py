@@ -117,6 +117,12 @@ class QualityGateType(StrEnum):
     API_CONTRACT = "api_contract"  # v2 — OpenAPI↔TS types consistency
     SRE_REVIEW = "sre_review"  # v2 — deploy-readiness gate (single SRE reviewer)
     GOAL_VERIFICATION = "goal_verification"
+    # Deterministic pre-review gate: machine-checkable project-convention
+    # rules that run BEFORE the LLM senior-review squad. A BLOCKER here
+    # short-circuits the LLM call (saves ~$5 per feature) and returns
+    # actionable feedback directly to the worker. Severity of each
+    # individual rule is configured in config/rules.yaml.
+    PRE_REVIEW_RULES = "pre_review_rules"  # v3 — deterministic pre-review
 
 
 # -----------------------------------------------------------------------------

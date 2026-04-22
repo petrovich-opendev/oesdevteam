@@ -294,7 +294,18 @@ def render_code_review_report(result: GateResult) -> str:
         lines += ["## Majors", ""]
         for f in majors:
             loc = f"{f['file']}:{f['line']}" if f.get("line") else f["file"]
-            lines += [f"- [{f['category']}] {f['summary']} @ `{loc}` — {f['fix']}"]
-        lines.append("")
+            lines += [
+                f"### `{f['category']}` — {f['summary']} @ `{loc}`",
+                "",
+                # `why` carries the diagnostic payload for reviewer_fault
+                # findings (e.g. repr of the caught exception). Dropping it
+                # from the rendered report made E2BIG / timeout failures
+                # look identical to ordinary design critique — operators
+                # could not see the underlying cause.
+                f"**Why:** {f['why']}",
+                "",
+                f"**Fix:** {f['fix']}",
+                "",
+            ]
 
     return "\n".join(lines)

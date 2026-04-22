@@ -1,0 +1,75 @@
+# ============================================================================
+# DevTeam Pre-Review Rules Engine
+# ============================================================================
+#
+# last_reviewed: 2026-04-22
+#
+# PURPOSE
+# -------
+# Machine-checkable checks that run BEFORE the LLM senior-review squad.
+# A rule that fires cancels the reviewer call (saving ~$5/feature) and
+# hands the failure back to the worker with a concrete fix suggestion.
+#
+# RULE LIFECYCLE
+# --------------
+# A new rule starts at severity: major, enabled: true, for one week. If
+# it fires > 1x with ≥ 1 confirmed true-positive, promote to blocker.
+# If it produces a false-positive, add a comment-suppression escape
+# hatch (e.g. `# noqa: <rule-id>`) before relaxing the rule.
+#
+# SEVERITY MEANING (same as LLM reviewer)
+# ---------------------------------------
+# blocker — feature cannot proceed to LLM review; reroute to worker.
+# major   — LLM review still runs; finding carried forward into aggregate.
+# minor   — informational; noted in pipeline-log but never blocks.
+#
+# ============================================================================
+
+version: 1
+
+rules:
+  # ----- Scaffold-only deliverables ---------------------------------------
+  # Caught BI-001e: worker committed empty __init__.py + regenerated TS
+  # types when goal required 5 concrete files. Wasted 3 reviewer rounds
+  # before getting to a meaningful finding.
+  R-scaffold-only:
+    enabled: true
+    severity: blocker
+
+  # ----- Goal-vs-diff divergence ------------------------------------------
+  # Caught BI-001d / BI-001e: goal text named files that were never added.
+  # Detects by extracting backticked / path-shaped tokens from the goal.
+  R-goal-file-missing:
+    enabled: true
+    severity: blocker
+
+  # ----- Silent exception handler (R-2 resilience) ------------------------
+  # Caught BI-006: `except Exception: return frozenset()` in CH loader.
+  # A silent handler on an external-system call is an outage waiting to
+  # happen. Escape hatch: `# noqa: silent-except` on the handler line.
+  R-silent-except:
+    enabled: true
+    severity: blocker
+
+  # ----- SQL identifier interpolation -------------------------------------
+  # Caught BI-005: `f"... FROM {table}"` guarded by whitelist + regex.
+  # Regex-based guard is not a substitute for driver-level identifier
+  # quoting. Classic SQL-injection primitive.
+  R-sql-identifier-fstring:
+    enabled: true
+    severity: blocker
+
+  # ----- metrics.yaml unit mismatch ---------------------------------------
+  # Caught BI-006: `waste_rock_volume` description said "масса" but unit
+  # was "м³". Widget operator sees two incompatible claims.
+  R-metrics-unit-mismatch:
+    enabled: true
+    severity: blocker
+
+  # ----- metrics.yaml sanity_bounds vs aggregation period -----------------
+  # Caught BI-006: downtime_hours.max=24 with period = week|month|quarter.
+  # Major rather than blocker: the widget still renders; calibration drift
+  # makes bounds lose their signalling value over time.
+  R-metrics-sanity-bounds-period:
+    enabled: true
+    severity: major

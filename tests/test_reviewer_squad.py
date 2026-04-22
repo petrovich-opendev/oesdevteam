@@ -416,3 +416,78 @@ class TestTotalFailure:
         for review in result.reviews:
             assert review.verdict == Verdict.NEEDS_REWORK
             assert review.findings[0].category == "reviewer_fault"
+
+
+# -----------------------------------------------------------------------------
+# Regression: huge files_changed must not crash the reviewer subprocess
+# -----------------------------------------------------------------------------
+#
+# A dirty worktree with ~13 000 unignored node_modules/ and dist/ files
+# inflates `files_changed` so that `build_task_message` produces a
+# ~900 KB string, which — passed as a single `-p <task>` argv entry —
+# blows past Linux MAX_ARG_STRLEN (128 KB) and raises OSError(7) at
+# execve() time. Every reviewer then fails with an opaque
+# `reviewer_fault @ <reviewer-infrastructure>`.
+#
+# `build_task_message` hard-caps the message at ~120 KB. These tests
+# pin the guarantee so a future refactor cannot silently reintroduce
+# the kernel-level failure.
+
+
+class TestHugeFilesListTruncation:
+    """`build_task_message` must cap the task at ~120 KB regardless of input."""
+
+    def test_task_message_stays_under_kernel_arg_limit(self):
+        from src.reviewers.squad import build_task_message
+
+        huge_files = [f"frontend/node_modules/some-package/lib/file-{i}.js" for i in range(10_000)]
+        ri = ReviewInput(
+            feature_id="REG-001",
+            feature_goal="Reproduce the node_modules leak scenario",
+            files_changed=huge_files,
+            diff="@@ trivial diff @@",
+            verify_commands=["pytest"],
+        )
+        task = build_task_message(ri)
+        # Stay safely under MAX_ARG_STRLEN (131 072 bytes). Internal target
+        # is 120 000; allow the marker to push beyond but never within
+        # 4 KB of the hard kernel limit.
+        assert len(task.encode("utf-8")) <= 127_000, (
+            f"task message exceeded the kernel-safe budget: {len(task.encode('utf-8'))} bytes"
+        )
+        assert "TRUNCATED for kernel ARG limits" in task
+
+    def test_small_task_is_not_truncated(self):
+        from src.reviewers.squad import build_task_message
+
+        ri = ReviewInput(
+            feature_id="REG-002",
+            feature_goal="Normal-sized feature",
+            files_changed=["src/a.py", "src/b.py"],
+            diff="@@ -1,1 +1,1 @@\n-old\n+new\n",
+            verify_commands=["pytest"],
+        )
+        task = build_task_message(ri)
+        assert "TRUNCATED" not in task
+
+
+class TestReviewerFaultCarriesReason:
+    """A reviewer crash must record the exception repr in `why` so the
+    rendered report has a real diagnostic (E2BIG, timeout, rc!=0, etc.)
+    instead of the generic 'check Claude CLI' fallback."""
+
+    async def test_reviewer_fault_finding_contains_exception_repr(self, review_input):
+        class _E2bigRunner:
+            async def run(self, *, role: AgentRole, system_prompt: str, task: str) -> str:
+                raise OSError(7, "Argument list too long")
+
+        result = await run_reviewer_squad(review_input, _E2bigRunner())
+
+        assert len(result.reviews) == 5
+        for review in result.reviews:
+            assert len(review.findings) == 1
+            finding = review.findings[0]
+            assert finding.category == "reviewer_fault"
+            # `why` must preserve the exception — it is the only place an
+            # operator sees the real cause in the rendered report.
+            assert "Argument list too long" in finding.why, finding.why
