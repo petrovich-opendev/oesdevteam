@@ -74,20 +74,76 @@ _PROMPT_FILENAME: dict[AgentRole, str] = {
     # prompt-loading machinery. The SRE gate (src/gates/sre_review_gate.py)
     # calls ``load_reviewer_prompt(SENIOR_SRE)`` directly.
     AgentRole.SENIOR_SRE: "senior_sre.md",
+    # Senior Go — activated by language dispatch when .go files are in
+    # the diff. Cites the Go pre-review rule IDs (R-go-*) defined in
+    # src/rules/rules_go.py.
+    AgentRole.SENIOR_GO: "senior_go.md",
+    # Senior Domain-Logic — reads namespace-local DOMAIN_LOGIC.md and
+    # enforces invariants against the diff. When the namespace has no
+    # DOMAIN_LOGIC.md, the prompt is filled with a fallback that asks
+    # the reviewer to surface a single `minor` finding and approve.
+    AgentRole.SENIOR_DOMAIN_LOGIC: "senior_domain_logic.md",
 }
 
 
-def load_reviewer_prompt(role: AgentRole, *, domain_context: str = "") -> str:
+# Fallback injected when a namespace has no DOMAIN_LOGIC.md. Tells the
+# senior_domain_logic reviewer to return a single minor "not configured"
+# finding + approve, rather than silently hallucinate invariants.
+_NO_INVARIANTS_FALLBACK = (
+    "(No DOMAIN_LOGIC.md found in this namespace. Return a single `minor` "
+    "finding with category `no_domain_invariants_configured` explaining "
+    "that the reviewer has nothing to check against, and approve.)"
+)
+
+
+# Header for the terminology block when prepended to a reviewer prompt.
+# The header tells the reviewer this is mandatory namespace policy — not
+# a project preference to weigh against other concerns. Reviewers
+# enforce terminology violations as findings in their own category vocabulary
+# (e.g. business_expert as `terminology`, senior_go as `readability`).
+_TERMINOLOGY_BLOCK_HEADER = (
+    "# Namespace terminology rules (mandatory)\n\n"
+    "The following terminology rules apply to this namespace. They are "
+    "**non-negotiable**: a banned term anywhere in the change — UI copy, "
+    "log messages, code comments, identifier names, error strings, "
+    "documentation — is a finding. Use the preferred terms in any "
+    "Russian or English text you write in your review (`why`/`fix` "
+    "fields). Severity for terminology violations: BLOCKER for user-"
+    "visible surfaces (UI, logs, public docs); MAJOR for code-internal "
+    "surfaces (identifiers, comments) where the wrong term will mislead "
+    "future maintainers; MINOR for one-off prose drift.\n\n"
+)
+
+
+def load_reviewer_prompt(
+    role: AgentRole,
+    *,
+    domain_context: str = "",
+    domain_invariants: str = "",
+    terminology: str = "",
+) -> str:
     """Load the prompt file for a reviewer role and fill placeholders.
 
-    Only the Business Expert prompt currently uses ``{{domain_context}}``;
-    for other roles the placeholder is absent and ``domain_context`` is
-    ignored.
+    Placeholders supported:
+
+    - ``{{domain_context}}`` — UX-layer brief. Used by
+      ``business_expert.md``.
+    - ``{{domain_invariants}}`` — code-layer invariants. Used by
+      ``senior_domain_logic.md``.
+
+    Terminology injection:
+    When ``terminology`` is non-empty, a mandatory-rules block is
+    prepended to the entire prompt — every reviewer in the squad sees
+    it. One edit to ``namespaces/<env>/<domain>/terminology.md`` propagates
+    to all reviewers, instead of drift between per-prompt hardcodes.
+
+    Other prompts ignore arguments they don't reference — placeholders
+    absent = no substitution.
 
     Raises:
         FileNotFoundError: if the prompt file is missing — the package is
             in a broken state; the pipeline should not silently proceed.
-        KeyError: if the role is not one of the five reviewer roles.
+        KeyError: if the role is not one of the registered reviewer roles.
     """
     if role not in _PROMPT_FILENAME:
         allowed = sorted(r.value for r in _PROMPT_FILENAME)
@@ -107,6 +163,19 @@ def load_reviewer_prompt(role: AgentRole, *, domain_context: str = "") -> str:
     # rewrite of a prompt that never asked for it.
     if "{{domain_context}}" in text:
         text = text.replace("{{domain_context}}", domain_context or "(not supplied)")
+    if "{{domain_invariants}}" in text:
+        text = text.replace(
+            "{{domain_invariants}}",
+            domain_invariants or _NO_INVARIANTS_FALLBACK,
+        )
+
+    # Terminology block goes at the very top so the reviewer reads it
+    # before role-specific instructions. Empty string skips injection
+    # entirely — the original prompt is returned unchanged for
+    # namespaces without a terminology.md file.
+    if terminology:
+        text = _TERMINOLOGY_BLOCK_HEADER + terminology.strip() + "\n\n---\n\n" + text
+
     return text
 
 

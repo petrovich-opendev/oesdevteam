@@ -27,6 +27,11 @@ else:
 
 # Filenames that count as "structural fluff" — if the diff consists almost
 # entirely of these, the worker has not actually implemented the feature.
+#
+# Go-generated artefacts (.pb.go, _grpc.pb.go, _mock.go, go.sum) are listed
+# alongside the Python / TS fluff because protobuf-generated code and
+# mock files are produced by tooling, not by the developer; a diff that
+# adds only those is a scaffold, identical to "added an empty __init__.py".
 _STRUCTURAL_FLUFF_SUFFIXES = (
     "/__init__.py",
     ".generated.ts",
@@ -35,6 +40,11 @@ _STRUCTURAL_FLUFF_SUFFIXES = (
     "openapi.json",
     "package-lock.json",
     ".snap",
+    ".pb.go",
+    "_grpc.pb.go",
+    "_mock.go",
+    "_gen.go",
+    "go.sum",
 )
 _MIN_IMPLEMENTATION_BYTES = 200
 

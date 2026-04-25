@@ -1,0 +1,56 @@
+# Security Audit Configuration
+# All paths relative to project root unless absolute.
+# Tool binaries are auto-discovered via PATH / current venv. Override
+# with `binary: <abs-path>` per-tool when running outside the venv.
+
+scanner:
+  # Minimum severity to report: LOW, MEDIUM, HIGH
+  min_severity: MEDIUM
+  # Block task completion on these severities
+  block_on:
+    - HIGH
+  # Paths to exclude from scanning
+  exclude_paths:
+    - ".venv"
+    - "*/.venv/*"
+    - "node_modules"
+    - "__pycache__"
+    - ".git"
+    - "audit_reports"
+
+semgrep:
+  # "auto" uses Semgrep Registry rules
+  config: "auto"
+  timeout: 300
+  # binary: /opt/venv/bin/semgrep      # uncomment to override discovery
+
+bandit:
+  # Confidence level: LOW, MEDIUM, HIGH
+  min_confidence: MEDIUM
+  timeout: 120
+  # binary: /opt/venv/bin/bandit       # uncomment to override discovery
+
+# Go security toolchain — looked up via PATH or $(go env GOPATH)/bin
+# unless `binary` is set. See security_audit._find_go_tool().
+gosec:
+  timeout: 120
+  # binary: /usr/local/go/bin/gosec
+
+govulncheck:
+  # govulncheck cross-references the call graph against vuln.go.dev;
+  # only reachable advisories are reported. All hits are HIGH (exploitable).
+  timeout: 180
+  # binary: /usr/local/go/bin/govulncheck
+
+buf:
+  # buf breaking compares the working tree against `base_ref` for every
+  # buf.yaml module under the target. Run when .proto files are in the diff.
+  timeout: 120
+  base_ref: main
+  # binary: /usr/local/bin/buf
+
+reports:
+  # Directory for JSON audit reports
+  output_dir: "security/audit_reports"
+  # Keep reports for N days (0 = forever)
+  retention_days: 0

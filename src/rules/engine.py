@@ -104,7 +104,10 @@ class RuleContext:
 
 # A rule is any callable ``(RuleContext) -> list[RuleFinding]``. We keep
 # the registry flat and explicit; adding a rule means importing it here
-# and appending to ``DEFAULT_RULES``.
+# and appending to ``DEFAULT_RULES``. Language-specific rules self-filter
+# by file extension inside the rule body; the engine does not pre-filter
+# by language because the cost of running an unmatched rule against a
+# diff with no .go / no .py files is a single tuple-iteration loop.
 from .checks import (  # noqa: E402 — avoid forward-declaration hoop
     rule_goal_file_missing,
     rule_metrics_sanity_bounds_period,
@@ -113,12 +116,28 @@ from .checks import (  # noqa: E402 — avoid forward-declaration hoop
     rule_silent_except,
     rule_sql_identifier_fstring,
 )
+from .rules_go import (  # noqa: E402
+    rule_go_silent_err,
+    rule_go_sql_concat,
+)
 
 DEFAULT_RULES: dict[str, object] = {
+    # Language-agnostic: scaffold-only and goal-vs-diff apply to every
+    # language and are the cheapest defects to surface.
     "R-scaffold-only": rule_scaffold_only,
     "R-goal-file-missing": rule_goal_file_missing,
+    # Python-only rules — internally skip when no .py files in diff.
     "R-silent-except": rule_silent_except,
     "R-sql-identifier-fstring": rule_sql_identifier_fstring,
+    # Go-only rules — internally skip when no .go files in diff. Mirror
+    # the Python silent-handler / SQL-injection rules; broader Go rule
+    # set (defer rows.Close, http.DefaultClient, panic, %v errors,
+    # WaitGroup ordering, proto compatibility) is documented in
+    # docs/PRE_REVIEW_RULES_ROADMAP.md as configuration requirements
+    # to be enforced via golangci-lint / go vet rather than this engine.
+    "R-go-silent-err": rule_go_silent_err,
+    "R-go-sql-concat": rule_go_sql_concat,
+    # Config-file rules — only fire when the relevant file is in the diff.
     "R-metrics-unit-mismatch": rule_metrics_unit_mismatch,
     "R-metrics-sanity-bounds-period": rule_metrics_sanity_bounds_period,
 }

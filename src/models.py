@@ -58,6 +58,15 @@ class AgentRole(StrEnum):
     # runs in its own gate, only when a feature touches deploy surface.
     SENIOR_SRE = "senior_sre"
 
+    # v2 — Senior Go reviewer. Activated by language dispatch when the diff
+    # contains .go files. See prompts/reviewers/senior_go.md.
+    SENIOR_GO = "senior_go"
+
+    # v2 — Senior Domain-Logic reviewer. Reads code-layer invariants from
+    # ``DOMAIN_LOGIC.md`` (state machines, ownership rules, reconciliation
+    # authority, tag-naming conventions). See prompts/reviewers/senior_domain_logic.md.
+    SENIOR_DOMAIN_LOGIC = "senior_domain_logic"
+
 
 class AgentStatus(StrEnum):
     """Lifecycle of a single agent invocation."""

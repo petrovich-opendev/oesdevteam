@@ -59,9 +59,22 @@ CACHE_FILENAME = ".oesdevteam-domain-context.md"
 # Keeps the Opus call bounded even for a repo with a 50 KB README.
 _SIGNAL_MAX_CHARS = 3_000
 
-# Cap on the final brief. Opus is told to stay under 200 words; we
-# trim harder here defensively in case the model ignores the limit.
+# Cap on Opus/fallback-generated briefs. Opus is told to stay under 200
+# words; we trim harder here defensively in case the model ignores the limit.
 _BRIEF_MAX_CHARS = 4_000
+
+# Higher cap for Tier-1 explicit DOMAIN.md — human authors of mature
+# industrial domains (with full terminology / units / regulatory matrix)
+# legitimately need more than 4K. We still cap defensively so a runaway
+# DOMAIN.md does not bloat every reviewer's context.
+_EXPLICIT_BRIEF_MAX_CHARS = 12_000
+
+# Cap on the code-layer DOMAIN_LOGIC.md (consumed by senior_domain_logic).
+# Invariants for a mature industrial domain (state machines, tag rules,
+# multi-source reconciliation, regulatory) legitimately need more room than
+# the UX-layer brief. Cap defends the reviewer against an overgrown file
+# swallowing its entire context window.
+_DOMAIN_LOGIC_MAX_CHARS = 20_000
 
 # Timeout for the Opus enrichment call. 120 s is plenty for 200-word
 # output; anything slower is almost certainly a hung subprocess.
@@ -150,8 +163,16 @@ async def build_domain_context(
     if explicit.exists():
         content = explicit.read_text(encoding="utf-8").strip()
         if content:
-            logger.info("domain context: using explicit DOMAIN.md (%d chars)", len(content))
-            return content[:_BRIEF_MAX_CHARS]
+            if len(content) > _EXPLICIT_BRIEF_MAX_CHARS:
+                logger.warning(
+                    "domain context: DOMAIN.md is %d chars, trimming to %d "
+                    "(consider splitting code-layer content into DOMAIN_LOGIC.md)",
+                    len(content),
+                    _EXPLICIT_BRIEF_MAX_CHARS,
+                )
+            else:
+                logger.info("domain context: using explicit DOMAIN.md (%d chars)", len(content))
+            return content[:_EXPLICIT_BRIEF_MAX_CHARS]
 
     signals = _collect_raw_signals(project_dir)
     if not signals:
@@ -195,6 +216,56 @@ async def build_domain_context(
     _write_cache(cache_path, signals_hash, brief)
     logger.info("domain context: new brief generated and cached (%d chars)", len(brief))
     return brief[:_BRIEF_MAX_CHARS]
+
+
+def build_domain_invariants(project_dir: Path) -> str:
+    """Return code-layer domain invariants for the senior_domain_logic reviewer.
+
+    Unlike ``build_domain_context`` (UX brief for the Business Expert),
+    this function does NOT fall back to Opus enrichment: code-layer
+    invariants — allowed state transitions, ownership rules, reconciliation
+    authority, tag-naming conventions — are not something an LLM can
+    responsibly synthesize from a README. Either the domain maintainer
+    has written ``DOMAIN_LOGIC.md`` by hand, or the reviewer has nothing
+    to check against.
+
+    Returns:
+        The contents of ``DOMAIN_LOGIC.md`` (capped at
+        ``_DOMAIN_LOGIC_MAX_CHARS``), or empty string if the file is
+        absent / empty. The squad loader substitutes an explanatory
+        fallback for reviewers when this is empty; do not invent invariants.
+    """
+    project_dir = project_dir.resolve()
+    path = project_dir / "DOMAIN_LOGIC.md"
+    if not path.exists():
+        logger.info(
+            "domain invariants: no DOMAIN_LOGIC.md in %s — senior_domain_logic "
+            "reviewer will be told the namespace is not configured for invariant review",
+            project_dir,
+        )
+        return ""
+    try:
+        content = path.read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeDecodeError) as exc:
+        logger.warning(
+            "domain invariants: failed to read DOMAIN_LOGIC.md at %s: %s",
+            path,
+            exc,
+        )
+        return ""
+    if not content:
+        logger.info("domain invariants: DOMAIN_LOGIC.md present but empty at %s", path)
+        return ""
+    if len(content) > _DOMAIN_LOGIC_MAX_CHARS:
+        logger.warning(
+            "domain invariants: DOMAIN_LOGIC.md is %d chars, trimming to %d "
+            "(consider splitting into multiple files referenced from the main doc)",
+            len(content),
+            _DOMAIN_LOGIC_MAX_CHARS,
+        )
+    else:
+        logger.info("domain invariants: using DOMAIN_LOGIC.md (%d chars)", len(content))
+    return content[:_DOMAIN_LOGIC_MAX_CHARS]
 
 
 # ---------------------------------------------------------------------------

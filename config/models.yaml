@@ -111,6 +111,16 @@ roles:
     max_cost_usd: 1.00
     rationale: "Deploy blast radius, rollback, migrations, observability — costly mistakes."
 
+  senior_go:
+    model: claude-opus-4-7
+    max_cost_usd: 1.00
+    rationale: "Catches Go-specific defects: silent err, defer rows.Close, http.DefaultClient, panic, %v error wrapping, WaitGroup ordering, proto compatibility."
+
+  senior_domain_logic:
+    model: claude-opus-4-7
+    max_cost_usd: 1.00
+    rationale: "Reads DOMAIN_LOGIC.md invariants (state machines, ownership rules, reconciliation authority) and enforces them against the diff."
+
   # Execution roles — benefit from deep reasoning but not always critical
   devops:
     model: claude-opus-4-7
